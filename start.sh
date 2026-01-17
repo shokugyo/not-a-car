@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# NOT A CAR - Startup Script
+# M-SUITE - Startup Script
 
 echo "================================================"
-echo "  NOT A CAR - Your car works while you sleep"
+echo "  M-SUITE - Your car works while you sleep"
 echo "================================================"
 echo ""
 
@@ -40,7 +40,7 @@ cd ..
 
 echo ""
 echo "================================================"
-echo "  NOT A CAR is running!"
+echo "  M-SUITE is running!"
 echo "================================================"
 echo ""
 echo "  Backend:  http://localhost:8000"

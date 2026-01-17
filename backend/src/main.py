@@ -22,7 +22,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.app_name,
-    description="NOT A CAR - Your car works while you sleep",
+    description="M-SUITE - Your car works while you sleep",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -47,7 +47,7 @@ app.include_router(ws_router, tags=["WebSocket"])
 @app.get("/")
 async def root():
     return {
-        "message": "NOT A CAR API",
+        "message": "M-SUITE API",
         "tagline": "Your car works while you sleep",
         "version": "1.0.0",
     }

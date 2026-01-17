@@ -47,7 +47,7 @@ export function LoginPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-white rounded-2xl shadow-lg mb-4">
             <Car className="text-primary-600" size={32} />
           </div>
-          <h1 className="text-3xl font-bold text-white">NOT A CAR</h1>
+          <h1 className="text-3xl font-bold text-white">M-SUITE</h1>
           <p className="text-primary-200 mt-2">Your car works while you sleep</p>
         </div>
 

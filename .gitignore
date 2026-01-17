@@ -1,0 +1,60 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+backend/venv/
+.env
+.venv
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+
+# Vite
+.vite/
+frontend/.vite/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Misc
+*.bak
+*.tmp

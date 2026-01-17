@@ -4,7 +4,7 @@ from typing import List, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.common.exceptions import NotFoundException, ForbiddenException, NotACarException
+from src.common.exceptions import NotFoundException, ForbiddenException, MSuiteException
 from .models import Vehicle, VehicleMode, InteriorMode, VehicleSchedule
 from .schemas import VehicleCreate, VehicleUpdate, ModeChange, ScheduleCreate
 
@@ -51,7 +51,7 @@ class VehicleService:
             select(Vehicle).where(Vehicle.license_plate == data.license_plate)
         )
         if existing.scalar_one_or_none():
-            raise NotACarException("License plate already registered")
+            raise MSuiteException("License plate already registered")
 
         vehicle = Vehicle(
             owner_id=owner_id,
@@ -95,11 +95,11 @@ class VehicleService:
         if mode_change.mode.value not in vehicle.allowed_modes and mode_change.mode not in [
             VehicleMode.IDLE, VehicleMode.MAINTENANCE, VehicleMode.CHARGING
         ]:
-            raise NotACarException(f"Mode {mode_change.mode.value} is not allowed for this vehicle")
+            raise MSuiteException(f"Mode {mode_change.mode.value} is not allowed for this vehicle")
 
         # Check if vehicle is available (unless forcing)
         if not vehicle.is_available and not mode_change.force:
-            raise NotACarException("Vehicle is currently busy. Use force=true to override")
+            raise MSuiteException("Vehicle is currently busy. Use force=true to override")
 
         # Update mode and interior
         vehicle.current_mode = mode_change.mode

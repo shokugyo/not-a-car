@@ -5,15 +5,15 @@ from functools import lru_cache
 
 class Settings(BaseSettings):
     # Application
-    app_name: str = "NOT A CAR"
+    app_name: str = "M-SUITE"
     debug: bool = True
     api_v1_prefix: str = "/api/v1"
 
     # Database
-    database_url: str = "sqlite+aiosqlite:///./not_a_car.db"
+    database_url: str = "sqlite+aiosqlite:///./m_suite.db"
 
     # JWT
-    secret_key: str = "your-secret-key-change-in-production-notacar2024"
+    secret_key: str = "your-secret-key-change-in-production-msuite2024"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7

@@ -106,7 +106,7 @@ export function Dashboard() {
                 <Car className="text-white" size={24} />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-900">NOT A CAR</h1>
+                <h1 className="text-xl font-bold text-gray-900">M-SUITE</h1>
                 <p className="text-sm text-gray-500">Your car works while you sleep</p>
               </div>
             </div>

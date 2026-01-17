@@ -8,7 +8,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql+asyncpg://notacar:notacar@db:5432/notacar
+      - DATABASE_URL=postgresql+asyncpg://msuite:msuite@db:5432/msuite
       - SECRET_KEY=your-production-secret-key-change-me
     depends_on:
       - db
@@ -30,9 +30,9 @@ services:
   db:
     image: postgres:15-alpine
     environment:
-      - POSTGRES_USER=notacar
-      - POSTGRES_PASSWORD=notacar
-      - POSTGRES_DB=notacar
+      - POSTGRES_USER=msuite
+      - POSTGRES_PASSWORD=msuite
+      - POSTGRES_DB=msuite
     ports:
       - "5432:5432"
     volumes:
