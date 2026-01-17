@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://notacar:notacar@db:5432/notacar
+      - SECRET_KEY=your-production-secret-key-change-me
+    depends_on:
+      - db
+    volumes:
+      - ./backend:/app
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm run dev -- --host
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=notacar
+      - POSTGRES_PASSWORD=notacar
+      - POSTGRES_DB=notacar
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
