@@ -1,4 +1,3 @@
-import React from 'react';
 import { Battery, MapPin } from 'lucide-react';
 import { Vehicle } from '../../types/vehicle';
 import { Card } from '../ui/Card';

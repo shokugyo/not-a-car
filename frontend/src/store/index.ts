@@ -5,6 +5,29 @@ import { RealtimeEarning, EarningsSummary } from '../types/earnings';
 import { YieldPrediction } from '../types/yield';
 import api from '../api/client';
 
+// UI State Store
+type SnapPoint = 0 | 1 | 2;
+
+interface UIState {
+  selectedVehicleId: number | null;
+  bottomSheetSnap: SnapPoint;
+  setSelectedVehicleId: (id: number | null) => void;
+  setBottomSheetSnap: (snap: SnapPoint) => void;
+}
+
+export const useUIStore = create<UIState>((set) => ({
+  selectedVehicleId: null,
+  bottomSheetSnap: 0,
+
+  setSelectedVehicleId: (id: number | null) => {
+    set({ selectedVehicleId: id });
+  },
+
+  setBottomSheetSnap: (snap: SnapPoint) => {
+    set({ bottomSheetSnap: snap });
+  },
+}));
+
 interface AuthState {
   owner: Owner | null;
   isAuthenticated: boolean;

@@ -1,0 +1,157 @@
+/* Leaflet Overrides for M-SUITE */
+
+/* Reset Leaflet container z-index to allow overlays on top */
+.leaflet-container {
+  z-index: 0 !important;
+}
+
+.leaflet-pane {
+  z-index: 1 !important;
+}
+
+.leaflet-tile-pane {
+  z-index: 1 !important;
+}
+
+.leaflet-overlay-pane {
+  z-index: 2 !important;
+}
+
+.leaflet-marker-pane {
+  z-index: 3 !important;
+}
+
+.leaflet-tooltip-pane {
+  z-index: 4 !important;
+}
+
+.leaflet-popup-pane {
+  z-index: 5 !important;
+}
+
+.leaflet-control {
+  z-index: 10 !important;
+}
+
+/* Hide default Leaflet attribution in mobile view */
+.leaflet-control-attribution {
+  font-size: 8px;
+  background: rgba(255, 255, 255, 0.7) !important;
+}
+
+/* Custom vehicle marker styles */
+.vehicle-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 3px solid white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s ease;
+}
+
+.vehicle-marker:hover {
+  transform: scale(1.1);
+}
+
+.vehicle-marker.selected {
+  transform: scale(1.2);
+  border-width: 4px;
+}
+
+.vehicle-marker-ring {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  animation: pulseRing 1.5s ease-out infinite;
+  pointer-events: none;
+}
+
+/* Mode-specific marker colors */
+.vehicle-marker-idle {
+  background: #6b7280;
+}
+
+.vehicle-marker-accommodation {
+  background: #9333ea;
+}
+
+.vehicle-marker-delivery {
+  background: #d97706;
+}
+
+.vehicle-marker-rideshare {
+  background: #2563eb;
+}
+
+.vehicle-marker-maintenance {
+  background: #ea580c;
+}
+
+.vehicle-marker-charging {
+  background: #16a34a;
+}
+
+.vehicle-marker-transit {
+  background: #0891b2;
+}
+
+/* Popup styles */
+.leaflet-popup-content-wrapper {
+  border-radius: 12px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.leaflet-popup-content {
+  margin: 0;
+  min-width: 200px;
+}
+
+.leaflet-popup-tip {
+  display: none;
+}
+
+/* Zoom controls positioning for mobile */
+.leaflet-control-zoom {
+  border: none !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+}
+
+.leaflet-control-zoom a {
+  border-radius: 8px !important;
+  width: 36px !important;
+  height: 36px !important;
+  line-height: 36px !important;
+  font-size: 18px !important;
+}
+
+.leaflet-control-zoom-in {
+  border-radius: 8px 8px 0 0 !important;
+}
+
+.leaflet-control-zoom-out {
+  border-radius: 0 0 8px 8px !important;
+}
+
+/* Position zoom controls for bottom sheet */
+.leaflet-bottom.leaflet-right {
+  bottom: 200px;
+  right: 12px;
+}
+
+/* Pulse animation for selected markers */
+@keyframes pulseRing {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}

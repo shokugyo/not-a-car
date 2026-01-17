@@ -1,8 +1,7 @@
-import React from 'react';
 import { Lightbulb, ArrowRight, TrendingUp } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
-import { ModeIndicator, getModeLabel } from '../../components/vehicle/ModeIndicator';
+import { ModeIndicator } from '../../components/vehicle/ModeIndicator';
 import { YieldPrediction } from '../../types/yield';
 import { VehicleMode } from '../../types/vehicle';
 
