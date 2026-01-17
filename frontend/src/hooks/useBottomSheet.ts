@@ -1,10 +1,11 @@
 import { useState, useCallback, useRef } from 'react';
 
-export type SnapPoint = 0 | 1 | 2;
+export type SnapPoint = 0 | 1 | 2 | 3;
 
 interface UseBottomSheetOptions {
   initialSnap?: SnapPoint;
   onSnapChange?: (snap: SnapPoint) => void;
+  maxSnap?: SnapPoint;
 }
 
 interface UseBottomSheetReturn {
@@ -21,14 +22,16 @@ interface UseBottomSheetReturn {
 
 // Snap point heights as percentages of viewport height
 const SNAP_HEIGHTS: Record<SnapPoint, number> = {
-  0: 15,  // Collapsed - 15vh
-  1: 45,  // Half - 45vh
-  2: 85,  // Expanded - 85vh
+  0: 15,   // Collapsed - 15vh
+  1: 45,   // Half - 45vh
+  2: 85,   // Expanded - 85vh
+  3: 100,  // Fullscreen - 100vh (Vehicle Detail Mode)
 };
 
 export function useBottomSheet({
   initialSnap = 0,
   onSnapChange,
+  maxSnap = 3,
 }: UseBottomSheetOptions = {}): UseBottomSheetReturn {
   const [snap, setSnapState] = useState<SnapPoint>(initialSnap);
   const [isDragging, setIsDragging] = useState(false);
@@ -79,8 +82,8 @@ export function useBottomSheet({
     const currentHeight = getHeightFromSnap(snap);
     const newTranslate = dragStartTranslate.current + deltaY;
 
-    // Limit drag range
-    const maxHeight = getHeightFromSnap(2);
+    // Limit drag range based on maxSnap
+    const maxHeight = getHeightFromSnap(maxSnap);
     const minHeight = getHeightFromSnap(0);
 
     const effectiveHeight = currentHeight - newTranslate;
@@ -96,7 +99,7 @@ export function useBottomSheet({
     } else {
       setTranslateY(newTranslate);
     }
-  }, [isDragging, snap]);
+  }, [isDragging, snap, maxSnap]);
 
   const handleTouchEnd = useCallback(() => {
     if (!isDragging) return;
@@ -112,18 +115,17 @@ export function useBottomSheet({
     if (Math.abs(velocity) > 0.5) {
       if (velocity < 0) {
         // Moving up (increasing height)
-        targetSnap = Math.min(2, snap + 1) as SnapPoint;
+        targetSnap = Math.min(maxSnap, snap + 1) as SnapPoint;
       } else {
         // Moving down (decreasing height)
         targetSnap = Math.max(0, snap - 1) as SnapPoint;
       }
     } else {
-      // Position-based snap
-      const snapHeights = [
-        getHeightFromSnap(0),
-        getHeightFromSnap(1),
-        getHeightFromSnap(2),
-      ];
+      // Position-based snap - build heights array based on maxSnap
+      const snapHeights: number[] = [];
+      for (let i = 0; i <= maxSnap; i++) {
+        snapHeights.push(getHeightFromSnap(i as SnapPoint));
+      }
 
       // Find closest snap point
       let closestSnap: SnapPoint = 0;
@@ -141,7 +143,7 @@ export function useBottomSheet({
     }
 
     setSnap(targetSnap);
-  }, [isDragging, snap, translateY, setSnap]);
+  }, [isDragging, snap, translateY, setSnap, maxSnap]);
 
   return {
     snap,

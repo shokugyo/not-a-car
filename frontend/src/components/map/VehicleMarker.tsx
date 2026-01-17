@@ -60,11 +60,11 @@ export function VehicleMarker({ vehicle, isSelected, onClick }: VehicleMarkerPro
 
   const icon = useMemo(() => {
     const iconHtml = renderToString(
-      <Icon size={20} color="white" strokeWidth={2.5} />
+      <Icon size={22} color="white" strokeWidth={2.5} />
     );
 
     const html = `
-      <div class="vehicle-marker ${config.markerClass} ${isSelected ? 'selected' : ''}" style="color: ${config.color}">
+      <div class="vehicle-marker ${config.markerClass} ${isSelected ? 'selected' : ''}" style="color: ${config.color}; background-color: ${config.color};">
         ${iconHtml}
         ${isSelected ? '<div class="vehicle-marker-ring"></div>' : ''}
       </div>
@@ -73,8 +73,8 @@ export function VehicleMarker({ vehicle, isSelected, onClick }: VehicleMarkerPro
     return L.divIcon({
       html,
       className: 'vehicle-marker-container',
-      iconSize: [44, 44],
-      iconAnchor: [22, 22],
+      iconSize: [48, 48],
+      iconAnchor: [24, 24],
     });
   }, [vehicle.current_mode, isSelected, config]);
 

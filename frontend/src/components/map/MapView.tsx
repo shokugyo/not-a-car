@@ -12,9 +12,9 @@ interface MapViewProps {
   onModeChange: (vehicleId: number, mode: VehicleMode) => void;
 }
 
-// Default center: Tokyo
-const DEFAULT_CENTER: [number, number] = [35.6762, 139.6503];
-const DEFAULT_ZOOM = 12;
+// Default center: Tokyo Station
+const DEFAULT_CENTER: [number, number] = [35.6812, 139.7671];
+const DEFAULT_ZOOM = 14;
 
 // Fix for default marker icons in Leaflet with webpack/vite
 delete (L.Icon.Default.prototype as any)._getIconUrl;

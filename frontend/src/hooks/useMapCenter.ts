@@ -15,11 +15,11 @@ interface UseMapCenterReturn {
   resetCenter: () => void;
 }
 
-// Default center: Tokyo
+// Default center: Tokyo Station
 const DEFAULT_CENTER: MapCenter = {
-  latitude: 35.6762,
-  longitude: 139.6503,
-  zoom: 12,
+  latitude: 35.6812,
+  longitude: 139.7671,
+  zoom: 14,
 };
 
 export function useMapCenter(): UseMapCenterReturn {

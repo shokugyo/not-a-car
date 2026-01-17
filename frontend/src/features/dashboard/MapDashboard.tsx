@@ -9,6 +9,7 @@ import {
   RecommendationCompact,
 } from '../../components/bottomsheet';
 import type { SnapPoint } from '../../components/bottomsheet';
+import { VehicleDetailSheet } from '../../components/vehicle';
 import { VehicleMode } from '../../types/vehicle';
 
 export function MapDashboard() {
@@ -29,11 +30,18 @@ export function MapDashboard() {
   const {
     selectedVehicleId,
     bottomSheetSnap,
+    isDetailMode,
     setSelectedVehicleId,
     setBottomSheetSnap,
+    openVehicleDetail,
+    closeVehicleDetail,
   } = useUIStore();
 
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isChangingMode, setIsChangingMode] = useState(false);
+
+  // Get selected vehicle object
+  const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId) || null;
 
   // Initial data fetch
   useEffect(() => {
@@ -73,26 +81,34 @@ export function MapDashboard() {
   };
 
   const handleModeChange = async (vehicleId: number, mode: VehicleMode) => {
+    setIsChangingMode(true);
     try {
       await changeMode(vehicleId, mode);
       await fetchRealtimeEarnings();
       await fetchPrediction(vehicleId);
     } catch (error) {
       console.error('Failed to change mode:', error);
+    } finally {
+      setIsChangingMode(false);
     }
   };
 
   const handleVehicleSelect = (vehicle: { id: number } | null) => {
-    setSelectedVehicleId(vehicle?.id ?? null);
-    // Expand bottom sheet when vehicle is selected
-    if (vehicle && bottomSheetSnap === 0) {
-      setBottomSheetSnap(1);
+    if (vehicle) {
+      // Open vehicle detail in fullscreen mode
+      openVehicleDetail(vehicle.id);
+    } else {
+      setSelectedVehicleId(null);
     }
   };
 
   const handleVehicleSelectFromList = (vehicle: { id: number }) => {
-    setSelectedVehicleId(vehicle.id);
-    // Keep the current snap position when selecting from list
+    // Open vehicle detail in fullscreen mode
+    openVehicleDetail(vehicle.id);
+  };
+
+  const handleCloseDetail = () => {
+    closeVehicleDetail();
   };
 
   const handleSnapChange = (snap: SnapPoint) => {
@@ -122,6 +138,18 @@ export function MapDashboard() {
       <BottomSheet
         snap={bottomSheetSnap}
         onSnapChange={handleSnapChange}
+        isDetailMode={isDetailMode}
+        detailContent={
+          selectedVehicle && (
+            <VehicleDetailSheet
+              vehicle={selectedVehicle}
+              prediction={predictions[selectedVehicle.id] || null}
+              onBack={handleCloseDetail}
+              onModeChange={handleModeChange}
+              isChangingMode={isChangingMode}
+            />
+          )
+        }
       >
         <div className="space-y-4">
           {/* Earnings Summary - Always visible */}

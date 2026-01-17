@@ -39,17 +39,26 @@
   background: rgba(255, 255, 255, 0.7) !important;
 }
 
+/* Reset divIcon container default styles */
+.vehicle-marker-container {
+  background: none !important;
+  border: none !important;
+  width: auto !important;
+  height: auto !important;
+}
+
 /* Custom vehicle marker styles */
 .vehicle-marker {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   border: 3px solid white;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   transition: transform 0.2s ease;
+  cursor: pointer;
 }
 
 .vehicle-marker:hover {

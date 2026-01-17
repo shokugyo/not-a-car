@@ -6,18 +6,23 @@ import { YieldPrediction } from '../types/yield';
 import api from '../api/client';
 
 // UI State Store
-type SnapPoint = 0 | 1 | 2;
+type SnapPoint = 0 | 1 | 2 | 3;
 
 interface UIState {
   selectedVehicleId: number | null;
   bottomSheetSnap: SnapPoint;
+  isDetailMode: boolean;
   setSelectedVehicleId: (id: number | null) => void;
   setBottomSheetSnap: (snap: SnapPoint) => void;
+  setDetailMode: (isDetail: boolean) => void;
+  openVehicleDetail: (vehicleId: number) => void;
+  closeVehicleDetail: () => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
   selectedVehicleId: null,
   bottomSheetSnap: 0,
+  isDetailMode: false,
 
   setSelectedVehicleId: (id: number | null) => {
     set({ selectedVehicleId: id });
@@ -25,6 +30,25 @@ export const useUIStore = create<UIState>((set) => ({
 
   setBottomSheetSnap: (snap: SnapPoint) => {
     set({ bottomSheetSnap: snap });
+  },
+
+  setDetailMode: (isDetail: boolean) => {
+    set({ isDetailMode: isDetail });
+  },
+
+  openVehicleDetail: (vehicleId: number) => {
+    set({
+      selectedVehicleId: vehicleId,
+      isDetailMode: true,
+      bottomSheetSnap: 3,
+    });
+  },
+
+  closeVehicleDetail: () => {
+    set({
+      isDetailMode: false,
+      bottomSheetSnap: 1,
+    });
   },
 }));
 
