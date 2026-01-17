@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useVehicleStore, useEarningsStore, useYieldStore, useUIStore } from '../../store';
+import { useVehicleStore, useEarningsStore, useYieldStore, useUIStore, useTripStore } from '../../store';
 import { MapView } from '../../components/map';
 import { TopOverlay } from '../../components/overlay';
 import {
@@ -11,6 +11,7 @@ import {
 import type { SnapPoint } from '../../components/bottomsheet';
 import { VehicleDetailSheet } from '../../components/vehicle';
 import { VehicleMode } from '../../types/vehicle';
+import { TripPlannerSheet } from '../trip';
 
 export function MapDashboard() {
   const {
@@ -31,11 +32,15 @@ export function MapDashboard() {
     selectedVehicleId,
     bottomSheetSnap,
     isDetailMode,
+    appMode,
     setSelectedVehicleId,
     setBottomSheetSnap,
+    setAppMode,
     openVehicleDetail,
     closeVehicleDetail,
   } = useUIStore();
+
+  const { resetTrip } = useTripStore();
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isChangingMode, setIsChangingMode] = useState(false);
@@ -115,6 +120,13 @@ export function MapDashboard() {
     setBottomSheetSnap(snap);
   };
 
+  const handleAppModeChange = (mode: 'owner' | 'user') => {
+    setAppMode(mode);
+    if (mode === 'user') {
+      resetTrip();
+    }
+  };
+
   return (
     <div className="h-screen-dvh h-screen w-full overflow-hidden bg-gray-100 relative">
       {/* Full Screen Map */}
@@ -132,15 +144,17 @@ export function MapDashboard() {
         earnings={realtimeEarnings}
         onRefresh={handleRefresh}
         isRefreshing={isRefreshing}
+        appMode={appMode}
+        onModeChange={handleAppModeChange}
       />
 
       {/* Bottom Sheet */}
       <BottomSheet
         snap={bottomSheetSnap}
         onSnapChange={handleSnapChange}
-        isDetailMode={isDetailMode}
+        isDetailMode={isDetailMode && appMode === 'owner'}
         detailContent={
-          selectedVehicle && (
+          selectedVehicle && appMode === 'owner' && (
             <VehicleDetailSheet
               vehicle={selectedVehicle}
               prediction={predictions[selectedVehicle.id] || null}
@@ -151,34 +165,38 @@ export function MapDashboard() {
           )
         }
       >
-        <div className="space-y-4">
-          {/* Earnings Summary - Always visible */}
-          <EarningsSummaryCompact
-            earnings={realtimeEarnings}
-            isLoading={vehiclesLoading}
-          />
-
-          {/* Vehicle List - Visible at snap 1+ */}
-          {bottomSheetSnap >= 1 && (
-            <div>
-              <h3 className="text-sm font-medium text-gray-500 mb-2">車両</h3>
-              <VehicleListCompact
-                vehicles={vehicles}
-                selectedVehicleId={selectedVehicleId}
-                onVehicleSelect={handleVehicleSelectFromList}
-              />
-            </div>
-          )}
-
-          {/* AI Recommendations - Visible at snap 2 */}
-          {bottomSheetSnap >= 2 && (
-            <RecommendationCompact
-              predictions={predictions}
-              vehicles={vehicles}
-              onModeChange={handleModeChange}
+        {appMode === 'owner' ? (
+          <div className="space-y-4">
+            {/* Earnings Summary - Always visible */}
+            <EarningsSummaryCompact
+              earnings={realtimeEarnings}
+              isLoading={vehiclesLoading}
             />
-          )}
-        </div>
+
+            {/* Vehicle List - Visible at snap 1+ */}
+            {bottomSheetSnap >= 1 && (
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 mb-2">車両</h3>
+                <VehicleListCompact
+                  vehicles={vehicles}
+                  selectedVehicleId={selectedVehicleId}
+                  onVehicleSelect={handleVehicleSelectFromList}
+                />
+              </div>
+            )}
+
+            {/* AI Recommendations - Visible at snap 2 */}
+            {bottomSheetSnap >= 2 && (
+              <RecommendationCompact
+                predictions={predictions}
+                vehicles={vehicles}
+                onModeChange={handleModeChange}
+              />
+            )}
+          </div>
+        ) : (
+          <TripPlannerSheet />
+        )}
       </BottomSheet>
     </div>
   );

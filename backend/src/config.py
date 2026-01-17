@@ -24,6 +24,15 @@ class Settings(BaseSettings):
     # Yield-Drive AI
     default_platform_fee_percent: float = 15.0
 
+    # LLM (Qwen) Settings
+    qwen_api_key: str = ""
+    qwen_api_base: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    qwen_model: str = "qwen-plus"
+    qwen_model_fast: str = "qwen-turbo"
+    qwen_max_tokens: int = 2048
+    qwen_temperature: float = 0.7
+    qwen_timeout: int = 30
+
     class Config:
         env_file = ".env"
 

@@ -10,6 +10,8 @@ from src.vehicles.router import router as vehicles_router
 from src.earnings.router import router as earnings_router
 from src.yield_engine.router import router as yield_router
 from src.ws_router import router as ws_router
+from src.llm.router import router as llm_router
+from src.routing.router import router as routing_router
 
 
 @asynccontextmanager
@@ -41,6 +43,8 @@ app.include_router(auth_router, prefix=f"{settings.api_v1_prefix}/auth", tags=["
 app.include_router(vehicles_router, prefix=f"{settings.api_v1_prefix}/vehicles", tags=["Vehicles"])
 app.include_router(earnings_router, prefix=f"{settings.api_v1_prefix}/earnings", tags=["Earnings"])
 app.include_router(yield_router, prefix=f"{settings.api_v1_prefix}/yield", tags=["Yield-Drive AI"])
+app.include_router(llm_router, prefix=f"{settings.api_v1_prefix}/llm", tags=["LLM"])
+app.include_router(routing_router, prefix=f"{settings.api_v1_prefix}/routing", tags=["Routing"])
 app.include_router(ws_router, tags=["WebSocket"])
 
 

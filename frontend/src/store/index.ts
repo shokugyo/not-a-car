@@ -3,6 +3,15 @@ import { Owner } from '../types/api';
 import { Vehicle, VehicleStatus } from '../types/vehicle';
 import { RealtimeEarning, EarningsSummary } from '../types/earnings';
 import { YieldPrediction } from '../types/yield';
+import {
+  AppMode,
+  TripStep,
+  Destination,
+  Route,
+  RouteSuggestionResponse,
+  TripVehicle,
+  TripBooking,
+} from '../types/trip';
 import api from '../api/client';
 
 // UI State Store
@@ -12,9 +21,11 @@ interface UIState {
   selectedVehicleId: number | null;
   bottomSheetSnap: SnapPoint;
   isDetailMode: boolean;
+  appMode: AppMode;
   setSelectedVehicleId: (id: number | null) => void;
   setBottomSheetSnap: (snap: SnapPoint) => void;
   setDetailMode: (isDetail: boolean) => void;
+  setAppMode: (mode: AppMode) => void;
   openVehicleDetail: (vehicleId: number) => void;
   closeVehicleDetail: () => void;
 }
@@ -23,6 +34,7 @@ export const useUIStore = create<UIState>((set) => ({
   selectedVehicleId: null,
   bottomSheetSnap: 0,
   isDetailMode: false,
+  appMode: 'owner',
 
   setSelectedVehicleId: (id: number | null) => {
     set({ selectedVehicleId: id });
@@ -34,6 +46,10 @@ export const useUIStore = create<UIState>((set) => ({
 
   setDetailMode: (isDetail: boolean) => {
     set({ isDetailMode: isDetail });
+  },
+
+  setAppMode: (mode: AppMode) => {
+    set({ appMode: mode, bottomSheetSnap: 1, isDetailMode: false });
   },
 
   openVehicleDetail: (vehicleId: number) => {
@@ -212,5 +228,177 @@ export const useYieldStore = create<YieldState>((set, get) => ({
       set({ isLoading: false });
       throw error;
     }
+  },
+}));
+
+// Trip State Store (User-side)
+interface TripState {
+  currentStep: TripStep;
+  searchQuery: string;
+  destinations: Destination[];
+  selectedDestination: Destination | null;
+  routeSuggestion: RouteSuggestionResponse | null;
+  selectedRoute: Route | null;
+  availableVehicles: TripVehicle[];
+  selectedTripVehicleId: number | null;
+  departureTime: string | null;
+  currentBooking: TripBooking | null;
+  isSearching: boolean;
+  isFetchingRoute: boolean;
+  isFetchingVehicles: boolean;
+  isBooking: boolean;
+  error: string | null;
+
+  // Actions
+  setSearchQuery: (query: string) => void;
+  searchDestinations: (query: string) => Promise<void>;
+  selectDestination: (destination: Destination | null) => void;
+  suggestRoutes: (query: string) => Promise<void>;
+  selectRoute: (route: Route | null) => void;
+  fetchAvailableVehicles: (routeId: string, departureTime: string) => Promise<void>;
+  selectTripVehicle: (vehicleId: number | null) => void;
+  setDepartureTime: (time: string | null) => void;
+  createBooking: () => Promise<void>;
+  setStep: (step: TripStep) => void;
+  resetTrip: () => void;
+  clearError: () => void;
+}
+
+export const useTripStore = create<TripState>((set, get) => ({
+  currentStep: 'search',
+  searchQuery: '',
+  destinations: [],
+  selectedDestination: null,
+  routeSuggestion: null,
+  selectedRoute: null,
+  availableVehicles: [],
+  selectedTripVehicleId: null,
+  departureTime: null,
+  currentBooking: null,
+  isSearching: false,
+  isFetchingRoute: false,
+  isFetchingVehicles: false,
+  isBooking: false,
+  error: null,
+
+  setSearchQuery: (query: string) => {
+    set({ searchQuery: query });
+  },
+
+  searchDestinations: async (query: string) => {
+    set({ isSearching: true, error: null });
+    try {
+      const response = await api.searchDestinations({ query });
+      set({ destinations: response.destinations, isSearching: false });
+    } catch (error) {
+      set({
+        error: '目的地の検索に失敗しました',
+        isSearching: false,
+      });
+    }
+  },
+
+  selectDestination: (destination: Destination | null) => {
+    set({ selectedDestination: destination });
+  },
+
+  suggestRoutes: async (query: string) => {
+    set({ isFetchingRoute: true, error: null });
+    try {
+      const response = await api.suggestRoutes({ query });
+      set({
+        routeSuggestion: response,
+        isFetchingRoute: false,
+        currentStep: 'plan',
+      });
+    } catch (error) {
+      set({
+        error: 'ルートの取得に失敗しました',
+        isFetchingRoute: false,
+      });
+    }
+  },
+
+  selectRoute: (route: Route | null) => {
+    set({ selectedRoute: route });
+    if (route) {
+      set({ currentStep: 'confirm' });
+    }
+  },
+
+  fetchAvailableVehicles: async (routeId: string, departureTime: string) => {
+    set({ isFetchingVehicles: true, error: null, departureTime });
+    try {
+      const response = await api.getAvailableVehicles({ routeId, departureTime });
+      set({
+        availableVehicles: response.vehicles,
+        isFetchingVehicles: false,
+        currentStep: 'vehicle',
+      });
+    } catch (error) {
+      set({
+        error: '利用可能な車両の取得に失敗しました',
+        isFetchingVehicles: false,
+      });
+    }
+  },
+
+  selectTripVehicle: (vehicleId: number | null) => {
+    set({ selectedTripVehicleId: vehicleId });
+  },
+
+  setDepartureTime: (time: string | null) => {
+    set({ departureTime: time });
+  },
+
+  createBooking: async () => {
+    const { selectedRoute, selectedTripVehicleId, departureTime } = get();
+    if (!selectedRoute || !selectedTripVehicleId || !departureTime) {
+      set({ error: '予約に必要な情報が不足しています' });
+      return;
+    }
+
+    set({ isBooking: true, error: null });
+    try {
+      const response = await api.createTripBooking({
+        routeId: selectedRoute.id,
+        vehicleId: selectedTripVehicleId,
+        departureTime,
+      });
+      set({
+        currentBooking: response.booking,
+        isBooking: false,
+        currentStep: 'complete',
+      });
+    } catch (error) {
+      set({
+        error: '予約の作成に失敗しました',
+        isBooking: false,
+      });
+    }
+  },
+
+  setStep: (step: TripStep) => {
+    set({ currentStep: step });
+  },
+
+  resetTrip: () => {
+    set({
+      currentStep: 'search',
+      searchQuery: '',
+      destinations: [],
+      selectedDestination: null,
+      routeSuggestion: null,
+      selectedRoute: null,
+      availableVehicles: [],
+      selectedTripVehicleId: null,
+      departureTime: null,
+      currentBooking: null,
+      error: null,
+    });
+  },
+
+  clearError: () => {
+    set({ error: null });
   },
 }));

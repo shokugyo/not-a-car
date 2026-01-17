@@ -1,5 +1,15 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import { Token, ApiError } from '../types/api';
+import {
+  DestinationSearchRequest,
+  DestinationSearchResponse,
+  RoutingRequest,
+  RouteSuggestionResponse,
+  AvailableVehiclesRequest,
+  AvailableVehiclesResponse,
+  TripBookingRequest,
+  TripBookingResponse,
+} from '../types/trip';
 
 const API_BASE_URL = '/api/v1';
 
@@ -169,6 +179,52 @@ class ApiClient {
   async compareModes(vehicleId: number, timeHorizon = 4) {
     const response = await this.client.get(
       `/yield/compare-modes/${vehicleId}?time_horizon=${timeHorizon}`
+    );
+    return response.data;
+  }
+
+  // Trip Planning (User-side)
+  async searchDestinations(
+    request: DestinationSearchRequest
+  ): Promise<DestinationSearchResponse> {
+    const response = await this.client.post<DestinationSearchResponse>(
+      '/routing/destinations/search',
+      request
+    );
+    return response.data;
+  }
+
+  async suggestRoutes(request: RoutingRequest): Promise<RouteSuggestionResponse> {
+    const response = await this.client.post<RouteSuggestionResponse>(
+      '/routing/suggest',
+      request
+    );
+    return response.data;
+  }
+
+  async getAvailableVehicles(
+    request: AvailableVehiclesRequest
+  ): Promise<AvailableVehiclesResponse> {
+    const response = await this.client.post<AvailableVehiclesResponse>(
+      '/routing/vehicles/available',
+      request
+    );
+    return response.data;
+  }
+
+  async createTripBooking(
+    request: TripBookingRequest
+  ): Promise<TripBookingResponse> {
+    const response = await this.client.post<TripBookingResponse>(
+      '/routing/bookings',
+      request
+    );
+    return response.data;
+  }
+
+  async getTripBookings(): Promise<TripBookingResponse[]> {
+    const response = await this.client.get<TripBookingResponse[]>(
+      '/routing/bookings'
     );
     return response.data;
   }
