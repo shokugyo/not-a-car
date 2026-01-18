@@ -11,6 +11,9 @@ import {
   RouteSuggestionResponse,
   TripVehicle,
   TripBooking,
+  StreamingState,
+  StreamingStep,
+  StreamEvent,
 } from '../types/trip';
 import api from '../api/client';
 
@@ -26,8 +29,10 @@ interface UIState {
   setBottomSheetSnap: (snap: SnapPoint) => void;
   setDetailMode: (isDetail: boolean) => void;
   setAppMode: (mode: AppMode) => void;
+  selectVehiclePreview: (vehicleId: number) => void;
   openVehicleDetail: (vehicleId: number) => void;
   closeVehicleDetail: () => void;
+  closePreview: () => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -52,6 +57,14 @@ export const useUIStore = create<UIState>((set) => ({
     set({ appMode: mode, bottomSheetSnap: 1, isDetailMode: false });
   },
 
+  selectVehiclePreview: (vehicleId: number) => {
+    set({
+      selectedVehicleId: vehicleId,
+      isDetailMode: false,
+      bottomSheetSnap: 1,
+    });
+  },
+
   openVehicleDetail: (vehicleId: number) => {
     set({
       selectedVehicleId: vehicleId,
@@ -62,6 +75,14 @@ export const useUIStore = create<UIState>((set) => ({
 
   closeVehicleDetail: () => {
     set({
+      isDetailMode: false,
+      bottomSheetSnap: 1,
+    });
+  },
+
+  closePreview: () => {
+    set({
+      selectedVehicleId: null,
       isDetailMode: false,
       bottomSheetSnap: 1,
     });
@@ -231,6 +252,13 @@ export const useYieldStore = create<YieldState>((set, get) => ({
   },
 }));
 
+// Default streaming steps
+const DEFAULT_STREAMING_STEPS: StreamingStep[] = [
+  { name: '目的地抽出', index: 0, status: 'pending', thinkingContent: '' },
+  { name: 'ルート候補生成', index: 1, status: 'pending', thinkingContent: '' },
+  { name: 'ルート評価', index: 2, status: 'pending', thinkingContent: '' },
+];
+
 // Trip State Store (User-side)
 interface TripState {
   currentStep: TripStep;
@@ -248,12 +276,20 @@ interface TripState {
   isFetchingVehicles: boolean;
   isBooking: boolean;
   error: string | null;
+  // Streaming state
+  streaming: StreamingState;
+  useStreaming: boolean;
 
   // Actions
   setSearchQuery: (query: string) => void;
   searchDestinations: (query: string) => Promise<void>;
   selectDestination: (destination: Destination | null) => void;
   suggestRoutes: (query: string) => Promise<void>;
+  suggestRoutesStreaming: (query: string) => Promise<void>;
+  handleStreamEvent: (event: StreamEvent) => void;
+  setStreamingRoutes: (routes: Route[]) => void;
+  cancelStreaming: () => void;
+  setUseStreaming: (useStreaming: boolean) => void;
   selectRoute: (route: Route | null) => void;
   fetchAvailableVehicles: (routeId: string, departureTime: string) => Promise<void>;
   selectTripVehicle: (vehicleId: number | null) => void;
@@ -263,6 +299,9 @@ interface TripState {
   resetTrip: () => void;
   clearError: () => void;
 }
+
+// Streaming abort controller reference (stored outside of state)
+let streamAbortController: AbortController | null = null;
 
 export const useTripStore = create<TripState>((set, get) => ({
   currentStep: 'search',
@@ -280,6 +319,13 @@ export const useTripStore = create<TripState>((set, get) => ({
   isFetchingVehicles: false,
   isBooking: false,
   error: null,
+  streaming: {
+    isStreaming: false,
+    currentStepIndex: null,
+    steps: DEFAULT_STREAMING_STEPS.map(s => ({ ...s })),
+    error: null,
+  },
+  useStreaming: true, // Enable streaming
 
   setSearchQuery: (query: string) => {
     set({ searchQuery: query });
@@ -308,6 +354,8 @@ export const useTripStore = create<TripState>((set, get) => ({
       const response = await api.suggestRoutes({ query });
       set({
         routeSuggestion: response,
+        // 最初のルートを自動選択
+        selectedRoute: response.routes.length > 0 ? response.routes[0] : null,
         isFetchingRoute: false,
         currentStep: 'plan',
       });
@@ -317,6 +365,292 @@ export const useTripStore = create<TripState>((set, get) => ({
         isFetchingRoute: false,
       });
     }
+  },
+
+  suggestRoutesStreaming: async (query: string) => {
+    // Cancel any existing stream
+    if (streamAbortController) {
+      streamAbortController.abort();
+    }
+
+    streamAbortController = new AbortController();
+
+    set({
+      isFetchingRoute: true,
+      error: null,
+      routeSuggestion: null,
+      streaming: {
+        isStreaming: true,
+        currentStepIndex: null,
+        steps: DEFAULT_STREAMING_STEPS.map(s => ({ ...s })),
+        error: null,
+      },
+    });
+
+    try {
+      const token = localStorage.getItem('access_token');
+      const response = await fetch('/api/v1/routing/suggest/stream', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ query }),
+        signal: streamAbortController.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('Response body is null');
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let eventCount = 0;
+
+      console.log('[SSE] Starting to read stream');
+
+      // Helper function to parse a single SSE event block
+      const parseSSEEvent = (eventBlock: string): StreamEvent | null => {
+        // Normalize line endings (CRLF to LF)
+        const normalizedBlock = eventBlock.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        const lines = normalizedBlock.split('\n');
+        let dataLines: string[] = [];
+
+        for (const line of lines) {
+          // Skip SSE comments (lines starting with :)
+          if (line.startsWith(':')) continue;
+          // Skip event type lines (we get type from JSON)
+          if (line.startsWith('event:')) continue;
+          // Collect data lines
+          if (line.startsWith('data:')) {
+            dataLines.push(line.slice(5));
+          }
+        }
+
+        if (dataLines.length === 0) return null;
+
+        // Join multiple data lines (SSE spec allows multi-line data)
+        const dataContent = dataLines.join('\n').trim();
+        if (!dataContent) return null;
+
+        try {
+          return JSON.parse(dataContent) as StreamEvent;
+        } catch (e) {
+          console.error('[SSE Parse Error]', e, dataContent.substring(0, 100));
+          return null;
+        }
+      };
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          console.log('[SSE] Stream ended, remaining buffer length:', buffer.length);
+          break;
+        }
+
+        const chunk = decoder.decode(value, { stream: true });
+        buffer += chunk;
+
+        // Normalize line endings for consistent splitting
+        // SSE spec uses \r\n but we normalize to \n for easier processing
+        buffer = buffer.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+        // Process complete SSE events (separated by double newline)
+        let eventEnd = buffer.indexOf('\n\n');
+        while (eventEnd !== -1) {
+          const eventBlock = buffer.substring(0, eventEnd);
+          buffer = buffer.substring(eventEnd + 2);
+
+          // Skip empty blocks and pure comment blocks
+          const trimmedBlock = eventBlock.trim();
+          if (trimmedBlock && !trimmedBlock.startsWith(':')) {
+            const event = parseSSEEvent(eventBlock);
+            if (event) {
+              eventCount++;
+              console.log('[SSE Event]', eventCount, event.event);
+              get().handleStreamEvent(event);
+            }
+          }
+
+          eventEnd = buffer.indexOf('\n\n');
+        }
+      }
+
+      // Process any remaining buffer after stream ends
+      if (buffer.trim()) {
+        console.log('[SSE] Processing final buffer, length:', buffer.length);
+        // Normalize and split remaining buffer
+        const normalizedBuffer = buffer.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        const remainingParts = normalizedBuffer.split('\n\n');
+        for (const eventBlock of remainingParts) {
+          const trimmedBlock = eventBlock.trim();
+          if (trimmedBlock && !trimmedBlock.startsWith(':')) {
+            const event = parseSSEEvent(eventBlock);
+            if (event) {
+              eventCount++;
+              console.log('[SSE Final Event]', eventCount, event.event);
+              get().handleStreamEvent(event);
+            }
+          }
+        }
+      }
+
+      console.log('[SSE Complete] Total events:', eventCount, 'routeSuggestion:', !!get().routeSuggestion);
+
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        // Stream was cancelled
+        return;
+      }
+
+      console.error('Stream error:', error);
+      set(state => ({
+        isFetchingRoute: false,
+        error: error instanceof Error ? error.message : 'ストリーミングエラー',
+        streaming: {
+          ...state.streaming,
+          isStreaming: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+      }));
+    }
+  },
+
+  handleStreamEvent: (event: StreamEvent) => {
+    console.log('[Stream Event]', event.event, event);
+    switch (event.event) {
+      case 'step_start':
+        set(state => ({
+          streaming: {
+            ...state.streaming,
+            currentStepIndex: event.step_index ?? null,
+            steps: state.streaming.steps.map(s =>
+              s.index === event.step_index
+                ? { ...s, status: 'active' as const, name: event.step_name || s.name }
+                : s
+            ),
+          },
+        }));
+        break;
+
+      case 'thinking':
+        console.log('[Thinking]', `step=${event.step_index}`, `content="${event.content}"`);
+        set(state => ({
+          streaming: {
+            ...state.streaming,
+            steps: state.streaming.steps.map(s =>
+              s.index === event.step_index
+                ? { ...s, thinkingContent: s.thinkingContent + (event.content || '') }
+                : s
+            ),
+          },
+        }));
+        break;
+
+      case 'step_complete':
+        set(state => ({
+          streaming: {
+            ...state.streaming,
+            steps: state.streaming.steps.map(s =>
+              s.index === event.step_index
+                ? { ...s, status: 'completed' as const }
+                : s
+            ),
+          },
+        }));
+        break;
+
+      case 'routes':
+        console.log('[Routes Event] data:', event.data);
+        if (event.data && 'routes' in event.data) {
+          const routes = event.data.routes as Route[];
+          console.log('[Routes Event] Setting routeSuggestion with', routes.length, 'routes');
+          set({
+            routeSuggestion: {
+              routes,
+              query: (event.data.query as string) || '',
+              generatedAt: (event.data.generatedAt as string) || new Date().toISOString(),
+            },
+            // 最初のルートを自動選択
+            selectedRoute: routes.length > 0 ? routes[0] : null,
+          });
+        } else {
+          console.warn('[Routes Event] Invalid data structure:', event.data);
+        }
+        break;
+
+      case 'done':
+        console.log('[Done Event] routeSuggestion:', get().routeSuggestion);
+        // If routeSuggestion is still null after done, show error
+        if (!get().routeSuggestion) {
+          console.error('[Done Event] routeSuggestion is null after streaming completed');
+          set(state => ({
+            isFetchingRoute: false,
+            currentStep: 'plan',
+            error: 'ルート情報の取得に失敗しました。再度お試しください。',
+            streaming: {
+              ...state.streaming,
+              isStreaming: false,
+              error: 'Routes event was not received',
+            },
+          }));
+        } else {
+          set(state => ({
+            isFetchingRoute: false,
+            currentStep: 'plan',
+            streaming: {
+              ...state.streaming,
+              isStreaming: false,
+            },
+          }));
+        }
+        break;
+
+      case 'error':
+        set(state => ({
+          isFetchingRoute: false,
+          error: event.content || 'Unknown error',
+          streaming: {
+            ...state.streaming,
+            isStreaming: false,
+            error: event.content || 'Unknown error',
+          },
+        }));
+        break;
+    }
+  },
+
+  setStreamingRoutes: (routes: Route[]) => {
+    set({
+      routeSuggestion: {
+        routes,
+        query: get().searchQuery,
+        generatedAt: new Date().toISOString(),
+      },
+    });
+  },
+
+  cancelStreaming: () => {
+    if (streamAbortController) {
+      streamAbortController.abort();
+      streamAbortController = null;
+    }
+    set(state => ({
+      isFetchingRoute: false,
+      streaming: {
+        ...state.streaming,
+        isStreaming: false,
+      },
+    }));
+  },
+
+  setUseStreaming: (useStreaming: boolean) => {
+    set({ useStreaming });
   },
 
   selectRoute: (route: Route | null) => {
@@ -359,23 +693,25 @@ export const useTripStore = create<TripState>((set, get) => ({
     }
 
     set({ isBooking: true, error: null });
-    try {
-      const response = await api.createTripBooking({
-        routeId: selectedRoute.id,
-        vehicleId: selectedTripVehicleId,
-        departureTime,
-      });
-      set({
-        currentBooking: response.booking,
-        isBooking: false,
-        currentStep: 'complete',
-      });
-    } catch (error) {
-      set({
-        error: '予約の作成に失敗しました',
-        isBooking: false,
-      });
-    }
+
+    // デモ用: バックエンドAPIを呼ばずにモック予約を作成
+    // 少し遅延を入れてリアルな感じを出す
+    await new Promise(resolve => setTimeout(resolve, 800));
+
+    const mockBooking: TripBooking = {
+      id: `BK-${Date.now().toString(36).toUpperCase()}`,
+      route: selectedRoute,
+      vehicleId: selectedTripVehicleId,
+      departureTime,
+      status: 'confirmed',
+      createdAt: new Date().toISOString(),
+    };
+
+    set({
+      currentBooking: mockBooking,
+      isBooking: false,
+      currentStep: 'complete',
+    });
   },
 
   setStep: (step: TripStep) => {
@@ -383,6 +719,11 @@ export const useTripStore = create<TripState>((set, get) => ({
   },
 
   resetTrip: () => {
+    // Cancel any existing stream
+    if (streamAbortController) {
+      streamAbortController.abort();
+      streamAbortController = null;
+    }
     set({
       currentStep: 'search',
       searchQuery: '',
@@ -395,6 +736,12 @@ export const useTripStore = create<TripState>((set, get) => ({
       departureTime: null,
       currentBooking: null,
       error: null,
+      streaming: {
+        isStreaming: false,
+        currentStepIndex: null,
+        steps: DEFAULT_STREAMING_STEPS.map(s => ({ ...s })),
+        error: null,
+      },
     });
   },
 

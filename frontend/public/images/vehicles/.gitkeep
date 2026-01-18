@@ -1,0 +1,7 @@
+# Vehicle Images Directory
+
+Place vehicle images here with the following naming convention:
+- {vehicleId}.jpg - Image for specific vehicle (e.g., 1.jpg, 2.jpg)
+- default.jpg - Fallback image when vehicle-specific image is not found
+
+Recommended image size: 800x450px (16:9 aspect ratio)

@@ -10,6 +10,9 @@ services:
     environment:
       - DATABASE_URL=postgresql+asyncpg://msuite:msuite@db:5432/msuite
       - SECRET_KEY=your-production-secret-key-change-me
+      - LLM_PROVIDER=auto
+      - LLM_FALLBACK_ENABLED=true
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
     depends_on:
       - db
     volumes:

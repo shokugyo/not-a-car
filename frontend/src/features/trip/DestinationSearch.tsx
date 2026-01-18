@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { Search, MapPin, Sparkles, Loader2 } from 'lucide-react';
 import { useTripStore } from '../../store';
+import { StreamingReasoningPanel } from '../../components/reasoning';
 
 const QUICK_SUGGESTIONS = [
   { label: '温泉旅行', query: '近くの温泉地でゆっくり過ごしたい' },
@@ -10,7 +11,17 @@ const QUICK_SUGGESTIONS = [
 ];
 
 export function DestinationSearch() {
-  const { searchQuery, setSearchQuery, suggestRoutes, isFetchingRoute, error } = useTripStore();
+  const {
+    searchQuery,
+    setSearchQuery,
+    suggestRoutes,
+    suggestRoutesStreaming,
+    cancelStreaming,
+    isFetchingRoute,
+    error,
+    streaming,
+    useStreaming,
+  } = useTripStore();
   const [inputValue, setInputValue] = useState(searchQuery);
 
   const handleSubmit = useCallback(
@@ -18,18 +29,26 @@ export function DestinationSearch() {
       e?.preventDefault();
       if (!inputValue.trim()) return;
       setSearchQuery(inputValue);
-      await suggestRoutes(inputValue);
+      if (useStreaming) {
+        await suggestRoutesStreaming(inputValue);
+      } else {
+        await suggestRoutes(inputValue);
+      }
     },
-    [inputValue, setSearchQuery, suggestRoutes]
+    [inputValue, setSearchQuery, suggestRoutes, suggestRoutesStreaming, useStreaming]
   );
 
   const handleQuickSuggestion = useCallback(
     async (query: string) => {
       setInputValue(query);
       setSearchQuery(query);
-      await suggestRoutes(query);
+      if (useStreaming) {
+        await suggestRoutesStreaming(query);
+      } else {
+        await suggestRoutes(query);
+      }
     },
-    [setSearchQuery, suggestRoutes]
+    [setSearchQuery, suggestRoutes, suggestRoutesStreaming, useStreaming]
   );
 
   return (
@@ -58,10 +77,9 @@ export function DestinationSearch() {
           />
           <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           {isFetchingRoute && (
-            <Loader2
-              size={18}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-primary-600 animate-spin"
-            />
+            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+              <Loader2 size={18} className="text-primary-600 animate-spin" />
+            </div>
           )}
         </div>
       </form>
@@ -89,12 +107,22 @@ export function DestinationSearch() {
         </div>
       </div>
 
+      {/* Streaming Reasoning Panel */}
+      {streaming.isStreaming && (
+        <StreamingReasoningPanel
+          streaming={streaming}
+          onCancel={cancelStreaming}
+        />
+      )}
+
       {/* Recent Searches (placeholder for future) */}
-      <div className="pt-2">
-        <p className="text-xs text-gray-400 text-center">
-          行きたい場所や体験を自由に入力してください
-        </p>
-      </div>
+      {!streaming.isStreaming && (
+        <div className="pt-2">
+          <p className="text-xs text-gray-400 text-center">
+            行きたい場所や体験を自由に入力してください
+          </p>
+        </div>
+      )}
     </div>
   );
 }

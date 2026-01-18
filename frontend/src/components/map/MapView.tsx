@@ -1,15 +1,18 @@
 import { useEffect } from 'react';
-import { MapContainer, TileLayer, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { Vehicle, VehicleMode } from '../../types/vehicle';
+import { Route } from '../../types/trip';
 import { VehicleMarker } from './VehicleMarker';
 import { VehiclePopup } from './VehiclePopup';
+import { RouteOverlay } from './RouteOverlay';
 
 interface MapViewProps {
   vehicles: Vehicle[];
   selectedVehicleId: number | null;
   onVehicleSelect: (vehicle: Vehicle | null) => void;
   onModeChange: (vehicleId: number, mode: VehicleMode) => void;
+  selectedRoute?: Route | null;
 }
 
 // Default center: Tokyo Station
@@ -24,25 +27,87 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
-function MapController({ vehicles, selectedVehicleId }: { vehicles: Vehicle[]; selectedVehicleId: number | null }) {
+function MapController({
+  vehicles,
+  selectedVehicleId,
+  selectedRoute,
+  onMapClick,
+}: {
+  vehicles: Vehicle[];
+  selectedVehicleId: number | null;
+  selectedRoute: Route | null;
+  onMapClick: () => void;
+}) {
   const map = useMap();
 
+  // Handle map click to deselect vehicle
+  useMapEvents({
+    click: () => {
+      onMapClick();
+    },
+  });
+
+  // Helper: fly to a point with vertical offset (to account for bottom UI)
+  // Offset the target southward so the actual point appears in upper portion of visible map
+  const flyToWithOffset = (lat: number, lng: number, zoom: number) => {
+    // Calculate offset based on zoom level (higher zoom = smaller offset in degrees)
+    // At zoom 16, roughly 0.002 degrees ≈ 200m offset
+    const offsetFactor = 0.003 / Math.pow(2, zoom - 14);
+    const offsetLat = lat - offsetFactor;
+    map.flyTo([offsetLat, lng], zoom, { duration: 0.5 });
+  };
+
   useEffect(() => {
+    // When route is displayed
+    if (selectedRoute) {
+      if (selectedVehicleId) {
+        // Vehicle selected: zoom to that vehicle (offset for bottom UI)
+        const vehicle = vehicles.find(v => v.id === selectedVehicleId);
+        if (vehicle) {
+          flyToWithOffset(vehicle.latitude, vehicle.longitude, 16);
+        }
+      } else {
+        // No vehicle selected: fit to entire route with more bottom padding
+        const routePositions: [number, number][] = [[35.6812, 139.7671]]; // Default origin
+        selectedRoute.waypoints.forEach((wp) => {
+          routePositions.push([wp.destination.latitude, wp.destination.longitude]);
+        });
+        if (routePositions.length >= 2) {
+          const bounds = L.latLngBounds(routePositions);
+          // Asymmetric padding: more on bottom to account for bottom sheet
+          map.fitBounds(bounds, {
+            paddingTopLeft: [40, 40],
+            paddingBottomRight: [40, 200], // Extra padding at bottom
+            maxZoom: 14,
+            animate: true,
+            duration: 0.5,
+          });
+        }
+      }
+      return;
+    }
+
+    // Normal mode (no route)
     if (vehicles.length === 0) return;
 
     if (selectedVehicleId) {
+      // Vehicle selected: zoom with offset
       const vehicle = vehicles.find(v => v.id === selectedVehicleId);
       if (vehicle) {
-        map.flyTo([vehicle.latitude, vehicle.longitude], 15, { duration: 0.5 });
+        flyToWithOffset(vehicle.latitude, vehicle.longitude, 15);
       }
     } else {
-      // Fit bounds to all vehicles
+      // Fit bounds to all vehicles with bottom padding
       const bounds = L.latLngBounds(
         vehicles.map(v => [v.latitude, v.longitude] as [number, number])
       );
-      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
+      map.fitBounds(bounds, {
+        paddingTopLeft: [40, 40],
+        paddingBottomRight: [40, 150],
+        maxZoom: 14,
+      });
     }
-  }, [vehicles.length, selectedVehicleId]);
+  }, [vehicles.length, selectedVehicleId, selectedRoute, map]);
 
   return null;
 }
@@ -51,16 +116,23 @@ export function MapView({
   vehicles,
   selectedVehicleId,
   onVehicleSelect,
-  onModeChange,
+  onModeChange: _onModeChange,
+  selectedRoute,
 }: MapViewProps) {
+  // onModeChange is passed for interface compatibility but mode changes are handled in bottom sheet
+  void _onModeChange;
+
   const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId);
 
   const handleVehicleClick = (vehicle: Vehicle) => {
     onVehicleSelect(vehicle.id === selectedVehicleId ? null : vehicle);
   };
 
-  const handlePopupClose = () => {
-    onVehicleSelect(null);
+  const handleMapClick = () => {
+    // Deselect vehicle when clicking on empty map area
+    if (selectedVehicleId) {
+      onVehicleSelect(null);
+    }
   };
 
   // Calculate initial center
@@ -84,7 +156,7 @@ export function MapView({
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
 
-      <MapController vehicles={vehicles} selectedVehicleId={selectedVehicleId} />
+      <MapController vehicles={vehicles} selectedVehicleId={selectedVehicleId} selectedRoute={selectedRoute || null} onMapClick={handleMapClick} />
 
       {vehicles.map((vehicle) => (
         <VehicleMarker
@@ -96,12 +168,10 @@ export function MapView({
       ))}
 
       {selectedVehicle && (
-        <VehiclePopup
-          vehicle={selectedVehicle}
-          onModeChange={onModeChange}
-          onClose={handlePopupClose}
-        />
+        <VehiclePopup vehicle={selectedVehicle} />
       )}
+
+      {selectedRoute && <RouteOverlay route={selectedRoute} />}
     </MapContainer>
   );
 }

@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { ChevronLeft, Clock, MapPin, Calendar, Route as RouteIcon, Loader2 } from 'lucide-react';
+import { ChevronLeft, Clock, MapPin, Route as RouteIcon, Loader2 } from 'lucide-react';
 import { useTripStore } from '../../store';
 
 export function TripConfirmation() {
@@ -11,20 +10,14 @@ export function TripConfirmation() {
     error,
   } = useTripStore();
 
-  const [departureDate, setDepartureDate] = useState(() => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow.toISOString().split('T')[0];
-  });
-  const [departureTime, setDepartureTime] = useState('09:00');
-
   const handleBack = () => {
     setStep('plan');
   };
 
   const handleProceed = async () => {
     if (!selectedRoute) return;
-    const departureDateTime = `${departureDate}T${departureTime}:00`;
+    // デフォルトで1時間後を出発時刻として使用（将来的にLLMで設定予定）
+    const departureDateTime = new Date(Date.now() + 60 * 60 * 1000).toISOString();
     await fetchAvailableVehicles(selectedRoute.id, departureDateTime);
   };
 
@@ -52,7 +45,7 @@ export function TripConfirmation() {
         </button>
         <div>
           <h2 className="text-lg font-bold text-gray-900">旅程の確認</h2>
-          <p className="text-xs text-gray-500">出発日時を設定してください</p>
+          <p className="text-xs text-gray-500">ルート内容を確認してください</p>
         </div>
       </div>
 
@@ -106,29 +99,6 @@ export function TripConfirmation() {
               </div>
             </div>
           ))}
-        </div>
-      </div>
-
-      {/* Date/Time Selection */}
-      <div className="space-y-3">
-        <h4 className="text-sm font-medium text-gray-700 flex items-center gap-2">
-          <Calendar size={16} className="text-gray-400" />
-          出発日時
-        </h4>
-        <div className="flex gap-3">
-          <input
-            type="date"
-            value={departureDate}
-            onChange={(e) => setDepartureDate(e.target.value)}
-            min={new Date().toISOString().split('T')[0]}
-            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
-          />
-          <input
-            type="time"
-            value={departureTime}
-            onChange={(e) => setDepartureTime(e.target.value)}
-            className="w-28 px-3 py-2 border border-gray-200 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
-          />
         </div>
       </div>
 

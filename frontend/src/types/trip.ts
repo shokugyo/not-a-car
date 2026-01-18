@@ -43,25 +43,37 @@ export interface Route {
   estimatedCost: number; // yen
   highlights: string[];
   vehicleTypes: string[]; // recommended vehicle types
+  polyline?: string; // Encoded polyline for map display
 }
 
 export interface RoutingRequest {
   query: string;
-  startLocation?: {
+  origin?: {
     latitude: number;
     longitude: number;
   };
-  preferences?: {
-    maxDuration?: number; // hours
-    maxCost?: number; // yen
-    interests?: string[];
-  };
+  desired_arrival?: string; // ISO format datetime
+  preferences?: string[];
+}
+
+export interface LLMStepMetadata {
+  step_name: string;
+  model_name: string;
+  duration_ms: number;
+  provider: string;
+}
+
+export interface ProcessingMetadata {
+  total_duration_ms: number;
+  steps: LLMStepMetadata[];
+  reasoning_steps: string[];
 }
 
 export interface RouteSuggestionResponse {
   routes: Route[];
   query: string;
   generatedAt: string;
+  processing?: ProcessingMetadata;
 }
 
 // Trip booking
@@ -106,4 +118,36 @@ export interface AvailableVehiclesRequest {
 
 export interface AvailableVehiclesResponse {
   vehicles: TripVehicle[];
+}
+
+// Streaming types
+export type StreamEventType =
+  | 'step_start'
+  | 'thinking'
+  | 'token'
+  | 'step_complete'
+  | 'routes'
+  | 'done'
+  | 'error';
+
+export interface StreamEvent {
+  event: StreamEventType;
+  step_name?: string;
+  step_index?: number;
+  content?: string;
+  data?: Record<string, unknown>;
+}
+
+export interface StreamingStep {
+  name: string;
+  index: number;
+  status: 'pending' | 'active' | 'completed';
+  thinkingContent: string;
+}
+
+export interface StreamingState {
+  isStreaming: boolean;
+  currentStepIndex: number | null;
+  steps: StreamingStep[];
+  error: string | null;
 }

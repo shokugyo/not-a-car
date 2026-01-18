@@ -1,4 +1,4 @@
-from .schemas import RoutingContext
+from .schemas import RoutingContext, DestinationExtraction
 
 ROUTE_EVALUATION_SYSTEM = """あなたは車両ルート提案AIアシスタントです。
 ユーザーの要望と複数のルート候補を分析し、最適なルートを推奨してください。
@@ -106,4 +106,111 @@ def build_general_chat_prompt(message: str, context: dict | None = None) -> list
     return [
         {"role": "system", "content": system_content},
         {"role": "user", "content": message},
+    ]
+
+
+DESTINATION_EXTRACTION_SYSTEM = """あなたは車両旅行プランニングAIです。
+ユーザーの自然言語クエリから、目的地に関する情報を抽出してください。
+
+**重要**: 以下の「候補地点情報」に含まれる地点を優先的に選択してください。
+これらの地点はルート計算やEV充電情報が事前に用意されており、より正確な提案が可能です。
+
+## 抽出する情報
+
+1. **waypoints**: 順序付きの経由地・目的地リスト
+   各waypointには以下の情報を含めます:
+   - name: 地名または施設タイプ（例: "箱根", "温泉", "道の駅"）
+   - type: 経由地の種類
+     - "required": 必須経由（「〜経由で」「〜を通って」「〜に寄って」）
+     - "optional": 任意（「できれば」「時間があれば」）
+     - "final": 最終目的地
+   - order: 訪問順序（0から開始）
+   - purpose: 立ち寄り目的（あれば）
+   - duration_hint: 滞在時間のヒント（あれば）
+
+2. **facility_types**: 施設の種類（waypointsに含まれない追加検索条件）
+   - 例: "温泉", "道の駅", "キャンプ場", "RVパーク", "サービスエリア"
+
+3. **amenities**: 求める設備・サービス
+   - 例: "EV充電", "WiFi", "シャワー", "トイレ", "コンビニ"
+
+4. **atmosphere**: 雰囲気・環境の希望
+   - 例: "静か", "景色が良い", "自然豊か", "人が少ない"
+
+5. **activities**: やりたいこと・目的
+   - 例: "車中泊", "ドライブ", "リフレッシュ", "観光", "食事"
+
+6. **time_constraints**: 時間的な制約（あれば）
+   - 例: "夜までに", "2時間以内", "日帰り"
+
+7. **distance_preference**: 距離の希望（あれば）
+   - 例: "近場", "遠出", "100km以内"
+
+## 経由地の判定ルール
+
+### 複数地点パターン
+- 「A経由でBへ」→ A(required, order:0), B(final, order:1)
+- 「Aを通ってBに行きたい」→ A(required, order:0), B(final, order:1)
+- 「Aに寄ってからBへ」→ A(required, order:0), B(final, order:1)
+- 「できればAに寄りたい、最終的にはB」→ A(optional, order:0), B(final, order:1)
+- 「AでランチしてからBで車中泊」→ A(required, order:0, purpose:"食事"), B(final, order:1, purpose:"車中泊")
+
+### 単一目的地パターン
+- 「河口湖に行きたい」→ waypoints: [河口湖(final, order:0)]
+- 「温泉に行きたい」→ waypoints: [温泉(final, order:0)], facility_types: ["温泉"]
+
+### 抽象的なパターン（具体的な地名がない場合）
+- 「静かな場所で車中泊したい」→ waypoints: [], atmosphere: ["静か"], activities: ["車中泊"]
+
+## 出力形式
+必ず以下のJSON形式で回答してください。該当がない項目は空配列またはnullにしてください。
+
+```json
+{
+  "waypoints": [
+    {"name": "経由地名", "type": "required", "order": 0, "purpose": null, "duration_hint": null},
+    {"name": "最終目的地名", "type": "final", "order": 1, "purpose": null, "duration_hint": null}
+  ],
+  "facility_types": ["施設種別1"],
+  "amenities": ["設備1", "設備2"],
+  "atmosphere": ["雰囲気1"],
+  "activities": ["活動1"],
+  "time_constraints": null,
+  "distance_preference": null,
+  "original_query": "元のクエリ"
+}
+```
+
+## 注意事項
+- 明示的に言及されていない情報は推測せず、空にしてください
+- 具体的な地名がある場合は必ずwaypointsに含めてください
+- 曖昧な表現は適切なカテゴリに分類してください
+  - "ゆっくりしたい" → atmosphere: ["静か"] または activities: ["リフレッシュ"]
+  - "充電できる場所" → amenities: ["EV充電"]
+"""
+
+
+def build_destination_extraction_prompt(
+    query: str,
+    location_context: str | None = None,
+) -> list[dict]:
+    """
+    目的地抽出用のプロンプトを構築
+
+    Args:
+        query: ユーザーの自然言語クエリ
+        location_context: RAGで取得した候補地点情報（オプション）
+
+    Returns:
+        LLMに送信するメッセージリスト
+    """
+    system_content = DESTINATION_EXTRACTION_SYSTEM
+
+    # RAGコンテキストがある場合はシステムプロンプトに追加
+    if location_context:
+        system_content += f"\n\n{location_context}"
+
+    return [
+        {"role": "system", "content": system_content},
+        {"role": "user", "content": f"以下のクエリから目的地情報を抽出してください:\n\n「{query}」"},
     ]

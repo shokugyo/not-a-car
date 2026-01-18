@@ -9,7 +9,7 @@ import {
   RecommendationCompact,
 } from '../../components/bottomsheet';
 import type { SnapPoint } from '../../components/bottomsheet';
-import { VehicleDetailSheet } from '../../components/vehicle';
+import { VehicleDetailSheet, VehiclePreviewCard } from '../../components/vehicle';
 import { VehicleMode } from '../../types/vehicle';
 import { TripPlannerSheet } from '../trip';
 
@@ -33,14 +33,15 @@ export function MapDashboard() {
     bottomSheetSnap,
     isDetailMode,
     appMode,
-    setSelectedVehicleId,
     setBottomSheetSnap,
     setAppMode,
+    selectVehiclePreview,
     openVehicleDetail,
     closeVehicleDetail,
+    closePreview,
   } = useUIStore();
 
-  const { resetTrip } = useTripStore();
+  const { resetTrip, selectedRoute } = useTripStore();
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isChangingMode, setIsChangingMode] = useState(false);
@@ -100,23 +101,40 @@ export function MapDashboard() {
 
   const handleVehicleSelect = (vehicle: { id: number } | null) => {
     if (vehicle) {
-      // Open vehicle detail in fullscreen mode
-      openVehicleDetail(vehicle.id);
+      // Show preview first (2-stage display)
+      selectVehiclePreview(vehicle.id);
     } else {
-      setSelectedVehicleId(null);
+      // Deselect and return to summary view
+      closePreview();
     }
   };
 
   const handleVehicleSelectFromList = (vehicle: { id: number }) => {
-    // Open vehicle detail in fullscreen mode
-    openVehicleDetail(vehicle.id);
+    // Show preview (same as marker tap)
+    selectVehiclePreview(vehicle.id);
   };
 
   const handleCloseDetail = () => {
     closeVehicleDetail();
   };
 
+  const handleClosePreview = () => {
+    closePreview();
+  };
+
+  const handleViewDetail = () => {
+    if (selectedVehicleId) {
+      openVehicleDetail(selectedVehicleId);
+    }
+  };
+
   const handleSnapChange = (snap: SnapPoint) => {
+    // If in preview mode (vehicle selected but not in detail mode) and user swipes up to snap 2+
+    // transition to full detail mode
+    if (selectedVehicleId && !isDetailMode && snap >= 2) {
+      openVehicleDetail(selectedVehicleId);
+      return;
+    }
     setBottomSheetSnap(snap);
   };
 
@@ -136,6 +154,7 @@ export function MapDashboard() {
           selectedVehicleId={selectedVehicleId}
           onVehicleSelect={handleVehicleSelect}
           onModeChange={handleModeChange}
+          selectedRoute={appMode === 'user' ? selectedRoute : null}
         />
       </div>
 
@@ -166,34 +185,47 @@ export function MapDashboard() {
         }
       >
         {appMode === 'owner' ? (
-          <div className="space-y-4">
-            {/* Earnings Summary - Always visible */}
-            <EarningsSummaryCompact
-              earnings={realtimeEarnings}
-              isLoading={vehiclesLoading}
+          selectedVehicleId && !isDetailMode && selectedVehicle ? (
+            // Preview mode: show compact vehicle preview card
+            <VehiclePreviewCard
+              vehicle={selectedVehicle}
+              prediction={predictions[selectedVehicleId] || null}
+              onViewDetail={handleViewDetail}
+              onClose={handleClosePreview}
+              onModeChange={handleModeChange}
+              isChangingMode={isChangingMode}
             />
-
-            {/* Vehicle List - Visible at snap 1+ */}
-            {bottomSheetSnap >= 1 && (
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-2">車両</h3>
-                <VehicleListCompact
-                  vehicles={vehicles}
-                  selectedVehicleId={selectedVehicleId}
-                  onVehicleSelect={handleVehicleSelectFromList}
-                />
-              </div>
-            )}
-
-            {/* AI Recommendations - Visible at snap 2 */}
-            {bottomSheetSnap >= 2 && (
-              <RecommendationCompact
-                predictions={predictions}
-                vehicles={vehicles}
-                onModeChange={handleModeChange}
+          ) : (
+            // Default mode: show earnings and vehicle list
+            <div className="space-y-4">
+              {/* Earnings Summary - Always visible */}
+              <EarningsSummaryCompact
+                earnings={realtimeEarnings}
+                isLoading={vehiclesLoading}
               />
-            )}
-          </div>
+
+              {/* Vehicle List - Visible at snap 1+ */}
+              {bottomSheetSnap >= 1 && (
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500 mb-2">車両</h3>
+                  <VehicleListCompact
+                    vehicles={vehicles}
+                    selectedVehicleId={selectedVehicleId}
+                    onVehicleSelect={handleVehicleSelectFromList}
+                  />
+                </div>
+              )}
+
+              {/* AI Recommendations - Visible at snap 2 */}
+              {bottomSheetSnap >= 2 && (
+                <RecommendationCompact
+                  predictions={predictions}
+                  vehicles={vehicles}
+                  onModeChange={handleModeChange}
+                />
+              )}
+            </div>
+          )
         ) : (
           <TripPlannerSheet />
         )}

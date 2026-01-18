@@ -1,7 +1,7 @@
 import { Vehicle, VehicleMode } from '../../types/vehicle';
 import { YieldPrediction, ModeRecommendation } from '../../types/yield';
 import { VehicleDetailHeader } from './VehicleDetailHeader';
-import { VehicleModel3D } from './VehicleModel3D';
+import { VehicleImage } from './VehicleImage';
 import { VehicleStats } from './VehicleStats';
 import { ModeSelector } from './ModeSelector';
 import { TrendingUp, Sparkles } from 'lucide-react';
@@ -48,11 +48,11 @@ export function VehicleDetailSheet({
 
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto space-y-4 pb-4">
-        {/* 3D Model */}
-        <VehicleModel3D
+        {/* Vehicle Image */}
+        <VehicleImage
+          vehicleId={vehicle.id}
           modelName={vehicle.model}
           className="h-48 w-full"
-          showControls={true}
         />
 
         {/* Stats */}

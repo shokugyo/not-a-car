@@ -2,7 +2,7 @@ import random
 from datetime import datetime, timedelta
 from typing import Optional
 
-from src.llm.schemas import RouteFeatures
+from src.llm.schemas import RouteFeatures, DestinationExtraction
 from .schemas import Coordinates
 
 
@@ -23,6 +23,11 @@ class MockRouteGenerator:
             "scenery_score": 4.5,
             "facilities": ["トイレ", "コンビニ", "温泉", "EV充電"],
             "charging": True,
+            # 検索マッチング用タグ
+            "place_tags": ["富士", "静岡"],
+            "facility_tags": ["道の駅", "温泉"],
+            "amenity_tags": ["EV充電", "トイレ", "コンビニ"],
+            "atmosphere_tags": ["静か", "景色が良い", "自然"],
         },
         {
             "name": "RVパーク 河口湖",
@@ -32,6 +37,10 @@ class MockRouteGenerator:
             "scenery_score": 5.0,
             "facilities": ["トイレ", "シャワー", "WiFi", "EV充電"],
             "charging": True,
+            "place_tags": ["河口湖", "山梨", "富士山"],
+            "facility_tags": ["RVパーク", "キャンプ場"],
+            "amenity_tags": ["EV充電", "WiFi", "シャワー", "トイレ"],
+            "atmosphere_tags": ["静か", "景色が良い", "自然", "湖"],
         },
         {
             "name": "道の駅 箱根峠",
@@ -41,6 +50,10 @@ class MockRouteGenerator:
             "scenery_score": 4.0,
             "facilities": ["トイレ", "レストラン", "お土産"],
             "charging": False,
+            "place_tags": ["箱根", "神奈川"],
+            "facility_tags": ["道の駅"],
+            "amenity_tags": ["トイレ", "レストラン"],
+            "atmosphere_tags": ["景色が良い", "山"],
         },
         {
             "name": "SA 足柄",
@@ -50,6 +63,10 @@ class MockRouteGenerator:
             "scenery_score": 3.0,
             "facilities": ["トイレ", "コンビニ", "ガソリンスタンド", "EV充電"],
             "charging": True,
+            "place_tags": ["足柄", "静岡", "神奈川"],
+            "facility_tags": ["サービスエリア", "SA"],
+            "amenity_tags": ["EV充電", "トイレ", "コンビニ", "ガソリン"],
+            "atmosphere_tags": [],
         },
         {
             "name": "キャンプ場 朝霧高原",
@@ -59,6 +76,10 @@ class MockRouteGenerator:
             "scenery_score": 4.8,
             "facilities": ["トイレ", "シャワー", "バーベキュー"],
             "charging": False,
+            "place_tags": ["朝霧高原", "静岡", "富士山"],
+            "facility_tags": ["キャンプ場"],
+            "amenity_tags": ["トイレ", "シャワー", "バーベキュー"],
+            "atmosphere_tags": ["静か", "自然", "景色が良い", "星空"],
         },
         {
             "name": "温泉施設 伊豆長岡",
@@ -68,6 +89,10 @@ class MockRouteGenerator:
             "scenery_score": 4.2,
             "facilities": ["温泉", "サウナ", "レストラン", "駐車場"],
             "charging": False,
+            "place_tags": ["伊豆", "静岡"],
+            "facility_tags": ["温泉", "温泉施設"],
+            "amenity_tags": ["温泉", "サウナ", "レストラン", "駐車場"],
+            "atmosphere_tags": ["静か", "リラックス"],
         },
         {
             "name": "道の駅 伊東マリンタウン",
@@ -77,6 +102,10 @@ class MockRouteGenerator:
             "scenery_score": 4.0,
             "facilities": ["トイレ", "温泉", "レストラン", "お土産"],
             "charging": True,
+            "place_tags": ["伊東", "伊豆", "静岡"],
+            "facility_tags": ["道の駅", "温泉"],
+            "amenity_tags": ["EV充電", "温泉", "トイレ", "レストラン"],
+            "atmosphere_tags": ["海", "景色が良い"],
         },
     ]
 
@@ -91,6 +120,7 @@ class MockRouteGenerator:
         count: int = 4,
         current_time: Optional[datetime] = None,
         preferences: Optional[list[str]] = None,
+        extraction: Optional[DestinationExtraction] = None,
     ) -> list[RouteFeatures]:
         """
         モック候補を生成
@@ -100,6 +130,7 @@ class MockRouteGenerator:
             count: 生成する候補数（3〜5推奨）
             current_time: 現在時刻
             preferences: ユーザーの好み（マッチする目的地を優先）
+            extraction: LLMで抽出した目的地情報
 
         Returns:
             ルート候補リスト
@@ -107,11 +138,18 @@ class MockRouteGenerator:
         current_time = current_time or datetime.now()
         count = min(count, len(self.MOCK_DESTINATIONS))
 
-        # 好みに基づいて目的地をソート
-        destinations = self._sort_by_preferences(
-            self.MOCK_DESTINATIONS.copy(),
-            preferences or [],
-        )
+        # 抽出結果に基づいてスコアリング
+        if extraction:
+            destinations = self._sort_by_extraction(
+                self.MOCK_DESTINATIONS.copy(),
+                extraction,
+            )
+        else:
+            # 旧来の好みに基づくソート（後方互換性）
+            destinations = self._sort_by_preferences(
+                self.MOCK_DESTINATIONS.copy(),
+                preferences or [],
+            )
 
         # 上位count件を選択
         selected = destinations[:count]
@@ -127,6 +165,68 @@ class MockRouteGenerator:
             ))
 
         return candidates
+
+    def _sort_by_extraction(
+        self,
+        destinations: list[dict],
+        extraction: DestinationExtraction,
+    ) -> list[dict]:
+        """LLM抽出結果に基づいて目的地をスコア付けしてソート"""
+
+        def match_score(items: list[str], tags: list[str]) -> int:
+            """アイテムリストとタグのマッチスコアを計算"""
+            score = 0
+            for item in items:
+                item_lower = item.lower()
+                for tag in tags:
+                    tag_lower = tag.lower()
+                    # 完全一致
+                    if item_lower == tag_lower:
+                        score += 5
+                    # 部分一致
+                    elif item_lower in tag_lower or tag_lower in item_lower:
+                        score += 3
+            return score
+
+        def score(dest: dict) -> float:
+            total_score = 0
+
+            # 地名マッチ（最重要）
+            place_tags = dest.get("place_tags", [])
+            total_score += match_score(extraction.place_names, place_tags) * 3
+
+            # 施設種別マッチ
+            facility_tags = dest.get("facility_tags", [])
+            total_score += match_score(extraction.facility_types, facility_tags) * 2
+
+            # 設備マッチ
+            amenity_tags = dest.get("amenity_tags", [])
+            total_score += match_score(extraction.amenities, amenity_tags) * 1.5
+
+            # 雰囲気マッチ
+            atmosphere_tags = dest.get("atmosphere_tags", [])
+            total_score += match_score(extraction.atmosphere, atmosphere_tags) * 1.5
+
+            # アクティビティに基づくボーナス
+            for activity in extraction.activities:
+                activity_lower = activity.lower()
+                if "車中泊" in activity_lower and dest["noise_level"] == "low":
+                    total_score += 5
+                if "ドライブ" in activity_lower and dest["scenery_score"] >= 4.0:
+                    total_score += 3
+                if "リフレッシュ" in activity_lower or "リラックス" in activity_lower:
+                    if dest["noise_level"] == "low":
+                        total_score += 3
+
+            # 景観スコアをベースラインとして追加
+            total_score += dest["scenery_score"]
+
+            return total_score
+
+        # スコアでソート（高い順）+ ランダム性を少し追加
+        random.shuffle(destinations)
+        destinations.sort(key=score, reverse=True)
+        return destinations
 
     def _sort_by_preferences(
         self,

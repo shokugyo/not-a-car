@@ -1,3 +1,4 @@
+from enum import Enum
 from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Optional
@@ -33,6 +34,7 @@ class RouteFeatures(BaseModel):
     noise_level: str = Field(default="medium", description="騒音レベル（low/medium/high）")
     scenery_score: float = Field(default=3.0, ge=1.0, le=5.0, description="景観スコア（1.0-5.0）")
     nearby_facilities: list[str] = Field(default_factory=list, description="周辺施設（例: ['温泉', 'コンビニ', 'トイレ']）")
+    polyline: Optional[str] = Field(None, description="エンコードされたポリライン（地図表示用）")
 
 
 class RoutingContext(BaseModel):
@@ -63,3 +65,57 @@ class ChatResponse(BaseModel):
     """汎用チャットレスポンス"""
     message: str = Field(..., description="AIからのレスポンス")
     metadata: Optional[dict] = Field(None, description="追加メタデータ")
+
+
+class WaypointType(str, Enum):
+    """経由地の種類"""
+    REQUIRED = "required"   # 必須経由（「〜経由で」「〜を通って」）
+    OPTIONAL = "optional"   # 寄り道希望（「できれば」「時間があれば」）
+    FINAL = "final"         # 最終目的地
+
+
+class ExtractedWaypoint(BaseModel):
+    """抽出された経由地情報"""
+    name: str = Field(..., description="地名または施設名")
+    type: WaypointType = Field(..., description="経由地の種類")
+    order: int = Field(..., ge=0, description="訪問順序（0から開始）")
+    purpose: Optional[str] = Field(None, description="立ち寄り目的（例: '休憩', '観光', '食事'）")
+    duration_hint: Optional[str] = Field(None, description="滞在時間のヒント（例: '30分程度', '1時間'）")
+
+
+class DestinationExtraction(BaseModel):
+    """ユーザークエリから抽出した目的地情報"""
+    waypoints: list[ExtractedWaypoint] = Field(
+        default_factory=list,
+        description="順序付き経由地リスト（経由地→最終目的地の順）"
+    )
+    facility_types: list[str] = Field(
+        default_factory=list,
+        description="施設種別（例: ['温泉', 'キャンプ場', '道の駅']）"
+    )
+    amenities: list[str] = Field(
+        default_factory=list,
+        description="求める設備・サービス（例: ['EV充電', 'WiFi', 'シャワー']）"
+    )
+    atmosphere: list[str] = Field(
+        default_factory=list,
+        description="雰囲気・環境の希望（例: ['静か', '景色が良い', '自然']）"
+    )
+    activities: list[str] = Field(
+        default_factory=list,
+        description="やりたいこと（例: ['車中泊', 'ドライブ', 'リフレッシュ']）"
+    )
+    time_constraints: Optional[str] = Field(
+        None,
+        description="時間的制約（例: '夜までに', '2時間以内'）"
+    )
+    distance_preference: Optional[str] = Field(
+        None,
+        description="距離の希望（例: '近場', '遠出', '100km以内'）"
+    )
+    original_query: str = Field(..., description="元のクエリ")
+
+    @property
+    def place_names(self) -> list[str]:
+        """waypointsから地名リストを取得（検索用ヘルパー）"""
+        return [w.name for w in self.waypoints]

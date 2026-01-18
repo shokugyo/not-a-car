@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from src.auth.dependencies import get_current_owner
 from src.auth.models import Owner
+from src.config import get_settings
 from .schemas import RoutingContext, RouteRecommendation, ChatRequest, ChatResponse
 from .service import LLMService
 
@@ -58,9 +59,45 @@ async def llm_status(
     owner: Owner = Depends(get_current_owner),
     service: LLMService = Depends(get_llm_service),
 ):
-    """LLMサービスのステータスを確認"""
+    """
+    LLMサービスのステータスを確認
+
+    Returns:
+        - provider: 現在のプロバイダー（cloud/local/mock）
+        - available: プロバイダーが利用可能か
+        - model: メインモデル名
+        - model_fast: 高速モデル名
+        - fallback情報（有効な場合）
+    """
+    settings = get_settings()
+    status = service.get_status()
+
     return {
-        "configured": service.client.is_configured,
-        "model": service.client._settings.qwen_model,
-        "model_fast": service.client._settings.qwen_model_fast,
+        **status,
+        "config": {
+            "llm_provider": settings.llm_provider,
+            "fallback_enabled": settings.llm_fallback_enabled,
+            "cloud_configured": bool(settings.qwen_api_key),
+            "ollama_base_url": settings.ollama_base_url,
+        }
     }
+
+
+@router.get("/health")
+async def llm_health(
+    owner: Owner = Depends(get_current_owner),
+    service: LLMService = Depends(get_llm_service),
+):
+    """
+    LLMサービスのヘルスチェック
+
+    実際にAPIにアクセスして応答を確認
+    """
+    try:
+        health = await service.health_check()
+        return health
+    except Exception as e:
+        return {
+            "healthy": False,
+            "error": str(e),
+        }

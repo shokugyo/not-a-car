@@ -1,6 +1,7 @@
 import { ChevronLeft, Clock, MapPin, Sparkles, Route as RouteIcon } from 'lucide-react';
 import { useTripStore } from '../../store';
 import { Route } from '../../types/trip';
+import { ReasoningStepsPanel } from '../../components/reasoning';
 
 interface RouteCardProps {
   route: Route;
@@ -76,8 +77,20 @@ export function RoutePlanView() {
 
   if (!routeSuggestion) {
     return (
-      <div className="flex items-center justify-center h-40">
-        <p className="text-gray-500">ルートを読み込み中...</p>
+      <div className="flex flex-col items-center justify-center h-40 gap-4">
+        {error ? (
+          <>
+            <p className="text-red-500">{error}</p>
+            <button
+              onClick={handleBack}
+              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+            >
+              検索に戻る
+            </button>
+          </>
+        ) : (
+          <p className="text-gray-500">ルートを読み込み中...</p>
+        )}
       </div>
     );
   }
@@ -106,6 +119,11 @@ export function RoutePlanView() {
       {/* Error Message */}
       {error && (
         <div className="p-3 bg-red-50 text-red-700 text-sm rounded-lg">{error}</div>
+      )}
+
+      {/* AI Reasoning Panel */}
+      {routeSuggestion?.processing && (
+        <ReasoningStepsPanel processing={routeSuggestion.processing} />
       )}
 
       {/* Route Options */}
